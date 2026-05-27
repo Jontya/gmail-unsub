@@ -115,7 +115,12 @@ export default function App() {
       }
     }
 
-    update({ phase: 'done' });
+    // Only go to 'done' when no pending items remain; otherwise stay in 'results'
+    // so the user can keep selecting and unsubscribing from remaining lists.
+    setState((s) => {
+      const hasPending = s.lists.some((l) => l.status === 'pending');
+      return { ...s, phase: hasPending ? 'results' : 'done' };
+    });
   }
 
   // ── Restart ─────────────────────────────────────────────────────────────────
@@ -225,7 +230,7 @@ export default function App() {
                 item={item}
                 index={index}
                 onToggle={toggleCard}
-                disabled={isUnsubscribing || phase === 'done'}
+                disabled={isUnsubscribing}
               />
             ))}
           </div>
