@@ -1,42 +1,145 @@
-/* ── Design tokens ── */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap');
+
+/* ═══════════════════════════════════════════════════
+   LIQUID GLASS — Design tokens
+═══════════════════════════════════════════════════ */
 :root {
-  --bg: #f5f5f7;
-  --surface: rgba(255, 255, 255, 0.85);
-  --surface-elevated: rgba(255, 255, 255, 0.95);
-  --border: rgba(0, 0, 0, 0.08);
-  --border-strong: rgba(0, 0, 0, 0.15);
-  --text-primary: #1d1d1f;
-  --text-secondary: #6e6e73;
-  --text-tertiary: #aeaeb2;
-  --accent: #0071e3;
-  --accent-hover: #0077ed;
-  --accent-light: rgba(0, 113, 227, 0.08);
-  --danger: #ff3b30;
-  --danger-hover: #ff2d20;
-  --success: #34c759;
-  --warning: #ff9500;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
-  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
+  /* Glass fills */
+  --glass-1:   rgba(255,255,255,0.06);
+  --glass-2:   rgba(255,255,255,0.09);
+  --glass-3:   rgba(255,255,255,0.13);
+  --glass-4:   rgba(255,255,255,0.20);
+
+  /* Glass borders */
+  --glass-border:        rgba(255,255,255,0.16);
+  --glass-border-strong: rgba(255,255,255,0.30);
+
+  /* Inset specular edge (top highlight) */
+  --specular-top:    inset 0 1px 0 rgba(255,255,255,0.45);
+  --specular-bottom: inset 0 -1px 0 rgba(0,0,0,0.20);
+
+  /* ── iOS 26 Liquid Glass frame (replaces CSS border on all glass surfaces) ──
+     Ported directly from the Apple iOS 26 Control Center Figma kit:
+     dark sub-pixel corners (TL + BR) paired with bright sub-pixel reflections,
+     plus a soft inner glow that gives the frosted-glass bloom. No CSS border needed. */
+  --glass-frame:
+    inset  1px  1px 0px   -0.5px rgba(55,55,55,0.80),
+    inset -1px -1px 0px   -0.5px rgba(38,38,38,0.80),
+    inset  1px  1px 0.5px -1px   rgba(255,255,255,0.80),
+    inset -1px -1px 0.5px -1px   rgba(255,255,255,0.80),
+    inset  0px  0px 4px    0px   rgba(255,255,255,0.18),
+    inset  0px  0px 22px   0px   rgba(210,210,210,0.07);
+
+  /* Text — all white-based for dark bg */
+  --text-primary:   rgba(255,255,255,0.95);
+  --text-secondary: rgba(255,255,255,0.58);
+  --text-tertiary:  rgba(255,255,255,0.32);
+
+  /* Accent — brightened for dark bg */
+  --accent:       #3d9eff;
+  --accent-hover: #5aabff;
+  --accent-text:  #8ec8ff;
+  --accent-fill:  rgba(61,158,255,0.18);
+  --accent-glow:  rgba(61,158,255,0.40);
+  --accent-light: rgba(61,158,255,0.14);
+
+  /* Semantic */
+  --danger:      #ff453a;
+  --danger-hover:#ff6058;
+  --danger-fill: rgba(255,69,58,0.18);
+  --danger-glow: rgba(255,69,58,0.40);
+  --success:     #32d74b;
+  --warning:     #ffd60a;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20);
+  --shadow-md: 0 4px 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.25);
+  --shadow-lg: 0 8px 48px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.30);
+
+  /* Blur */
+  --blur:       blur(36px) saturate(180%);
+  --blur-heavy: blur(56px) saturate(200%);
+  --blur-light: blur(16px) saturate(160%);
+
+  /* Radii */
+  --radius-sm:   8px;
+  --radius-md:   13px;
+  --radius-lg:   18px;
+  --radius-xl:   24px;
+  --radius-pill: 999px;
+
+  /* Font */
+  --font: "DM Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
 }
 
-/* ── Reset ── */
+/* ═══════════════════════════════════════════════════
+   Reset
+═══════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
-body {
-  font-family: var(--font);
-  background: var(--bg);
-  background-image: radial-gradient(ellipse at 50% 20%, rgba(255,255,255,0.8) 0%, transparent 70%);
-  color: var(--text-primary);
-  min-height: 100vh;
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; }
 input  { font-family: inherit; }
-a { color: inherit; }
+a      { color: inherit; }
+
+/* ═══════════════════════════════════════════════════
+   Aurora background — two animated layers
+═══════════════════════════════════════════════════ */
+body {
+  font-family: var(--font);
+  background: #060c1a;
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Layer 1 — blue / violet aurora */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -30%;
+  width: 160%;
+  height: 160%;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 18%, rgba(29,78,216,0.55) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 65% at 82% 82%, rgba(109,40,217,0.45) 0%, transparent 65%),
+    radial-gradient(ellipse 45% 45% at 50% 50%, rgba(12,20,60,0.85)  0%, transparent 80%);
+  animation: aurora-a 22s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: -2;
+}
+
+/* Layer 2 — teal / rose aurora */
+body::after {
+  content: '';
+  position: fixed;
+  inset: -30%;
+  width: 160%;
+  height: 160%;
+  background:
+    radial-gradient(ellipse 55% 50% at 72% 18%, rgba(6,95,70,0.38)  0%, transparent 60%),
+    radial-gradient(ellipse 50% 55% at 22% 78%, rgba(190,24,93,0.28) 0%, transparent 60%),
+    radial-gradient(ellipse 35% 40% at 88% 50%, rgba(56,189,248,0.18) 0%, transparent 55%);
+  animation: aurora-b 28s ease-in-out infinite alternate-reverse;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes aurora-a {
+  0%   { transform: translate(0,    0)    scale(1);    }
+  33%  { transform: translate(-4%,  6%)   scale(1.06); }
+  66%  { transform: translate(5%,  -4%)   scale(0.96); }
+  100% { transform: translate(-2%,  3%)   scale(1.04); }
+}
+@keyframes aurora-b {
+  0%   { transform: translate(0,    0)    scale(1);    }
+  40%  { transform: translate(5%,  -6%)   scale(1.05); }
+  80%  { transform: translate(-4%,  4%)   scale(0.95); }
+  100% { transform: translate(3%,  -2%)   scale(1.02); }
+}

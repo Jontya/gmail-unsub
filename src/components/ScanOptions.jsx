@@ -1,9 +1,11 @@
+// Colors tuned for dark liquid-glass background
 const CATEGORIES = [
   {
     key: 'primary',
     label: 'Primary',
-    color: '#0071e3',
-    bg: '#e8f2fd',
+    color: 'rgba(90,171,255,1)',
+    borderColor: 'rgba(61,158,255,0.55)',
+    bg: 'rgba(61,158,255,0.18)',
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
@@ -14,8 +16,9 @@ const CATEGORIES = [
   {
     key: 'promotions',
     label: 'Promotions',
-    color: '#ff9500',
-    bg: '#fff4e0',
+    color: 'rgba(255,200,80,1)',
+    borderColor: 'rgba(255,160,0,0.55)',
+    bg: 'rgba(255,149,0,0.18)',
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
@@ -26,8 +29,9 @@ const CATEGORIES = [
   {
     key: 'social',
     label: 'Social',
-    color: '#34c759',
-    bg: '#e6f9ec',
+    color: 'rgba(140,230,160,1)',
+    borderColor: 'rgba(50,215,75,0.55)',
+    bg: 'rgba(50,215,75,0.18)',
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -40,8 +44,9 @@ const CATEGORIES = [
   {
     key: 'updates',
     label: 'Updates',
-    color: '#6e3dcc',
-    bg: '#f0eafc',
+    color: 'rgba(210,175,255,1)',
+    borderColor: 'rgba(175,100,255,0.55)',
+    bg: 'rgba(175,100,255,0.18)',
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -89,14 +94,14 @@ export default function ScanOptions({ emailCount, onEmailCountChange, categories
       <div className="scan-options__group">
         <span className="scan-options__label">Inboxes to include</span>
         <div className="category-chips">
-          {CATEGORIES.map(({ key, label, color, bg, icon }) => {
+          {CATEGORIES.map(({ key, label, color, borderColor, bg, icon }) => {
             const on = categories[key];
             return (
               <button
                 key={key}
                 type="button"
                 className={`cat-chip${on ? ' cat-chip--on' : ''}`}
-                style={on ? { background: bg, borderColor: color, color } : {}}
+                style={on ? { background: bg, borderColor, color } : {}}
                 onClick={() => !disabled && onCategoryToggle(key)}
                 disabled={disabled}
                 aria-pressed={on}
@@ -106,7 +111,7 @@ export default function ScanOptions({ emailCount, onEmailCountChange, categories
                 </span>
                 {label}
                 {on && (
-                  <span className="cat-chip__check" style={{ background: color }}>
+                  <span className="cat-chip__check" style={{ background: borderColor }}>
                     <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
                       <polyline points="1.5 5 4 7.5 8.5 2.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>

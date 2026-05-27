@@ -1,10 +1,11 @@
+// Glass-friendly palette — semi-transparent tints with bright text
 const COLORS = [
-  { bg: '#e8f0fe', fg: '#1a73e8' }, // blue
-  { bg: '#fce8e6', fg: '#d93025' }, // red
-  { bg: '#e6f4ea', fg: '#188038' }, // green
-  { bg: '#fef7e0', fg: '#e37400' }, // yellow
-  { bg: '#f3e8fd', fg: '#8430ce' }, // purple
-  { bg: '#e8f5fb', fg: '#0097a7' }, // teal
+  { bg: 'rgba(61,158,255,0.28)',  fg: 'rgba(172,220,255,1)' }, // blue
+  { bg: 'rgba(255,69,58,0.28)',   fg: 'rgba(255,160,155,1)' }, // red
+  { bg: 'rgba(50,215,75,0.25)',   fg: 'rgba(140,230,160,1)' }, // green
+  { bg: 'rgba(255,214,10,0.25)',  fg: 'rgba(255,235,120,1)' }, // yellow
+  { bg: 'rgba(191,90,242,0.28)',  fg: 'rgba(220,170,255,1)' }, // purple
+  { bg: 'rgba(90,200,250,0.25)',  fg: 'rgba(170,235,255,1)' }, // teal
 ];
 
 /**

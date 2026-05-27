@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 
 import Header from './components/Header';
 import ApiKeyInput from './components/ApiKeyInput';
+import GoogleConnect from './components/GoogleConnect';
 import ScanOptions from './components/ScanOptions';
 import ScanButton from './components/ScanButton';
 import ResultsHeader from './components/ResultsHeader';
@@ -12,6 +13,7 @@ import Toast from './components/Toast';
 
 import { scanInbox } from './hooks/useGmailScanner';
 import { unsubscribeOne } from './hooks/useUnsubscriber';
+import { useGoogleAuth } from './hooks/useGoogleAuth';
 
 import './styles/global.css';
 import './styles/components.css';
@@ -28,6 +30,8 @@ const INITIAL_STATE = {
 
 export default function App() {
   const [state, setState] = useState(INITIAL_STATE);
+  const { token: googleToken, loading: googleLoading, error: googleError,
+          gisReady, connect: connectGoogle, disconnect: disconnectGoogle } = useGoogleAuth();
 
   const update = (patch) => setState((s) => ({ ...s, ...patch }));
 
@@ -53,16 +57,17 @@ export default function App() {
     update({ keyError: '', phase: 'scanning' });
 
     try {
-      const lists = await scanInbox(apiKey.trim(), state.emailCount, state.categories);
+      const lists = await scanInbox(apiKey.trim(), googleToken, state.emailCount, state.categories);
       update({ phase: 'results', lists });
     } catch (err) {
       update({ phase: 'idle' });
       const msg = err.message || 'Unknown error';
-      if (
-        msg.toLowerCase().includes('api_key') ||
-        msg.toLowerCase().includes('authentication') ||
-        msg.toLowerCase().includes('invalid x-api-key')
-      ) {
+      console.error('[scan error]', msg);
+      // Only treat as an API key error when Anthropic explicitly says so
+      const isKeyError =
+        msg.toLowerCase().includes('invalid x-api-key') ||
+        (msg.toLowerCase().includes('api_key') && !msg.toLowerCase().includes('mcp'));
+      if (isKeyError) {
         update({ keyError: 'Invalid API key. Please check and try again.' });
       } else {
         showToast(`Scan failed: ${msg}`);
@@ -112,7 +117,7 @@ export default function App() {
     // Sequential processing
     for (const item of selected) {
       try {
-        const result = await unsubscribeOne(state.apiKey.trim(), item);
+        const result = await unsubscribeOne(state.apiKey.trim(), googleToken, item);
         setState((s) => ({
           ...s,
           lists: s.lists.map((li) =>
@@ -152,6 +157,7 @@ export default function App() {
   // ── Derived ─────────────────────────────────────────────────────────────────
   const { apiKey, phase, lists, toast, keyError, emailCount, categories } = state;
   const noCategorySelected = Object.values(categories).every((v) => !v);
+  const gmailConnected = Boolean(googleToken);
   const pendingLists = lists.filter((l) => l.status === 'pending');
   const checkedCount = pendingLists.filter((l) => l.checked).length;
   const allChecked   = pendingLists.length > 0 && pendingLists.every((l) => l.checked);
@@ -174,7 +180,18 @@ export default function App() {
         disabled={isScanning || isUnsubscribing}
       />
 
-      {/* Step 2 – Scan options */}
+      {/* Step 2 – Gmail OAuth */}
+      <GoogleConnect
+        token={googleToken}
+        loading={googleLoading}
+        error={googleError}
+        gisReady={gisReady}
+        onConnect={connectGoogle}
+        onDisconnect={disconnectGoogle}
+        disabled={isScanning || isUnsubscribing}
+      />
+
+      {/* Step 3 – Scan options */}
       {!showResults && (
         <ScanOptions
           emailCount={emailCount}
@@ -185,11 +202,11 @@ export default function App() {
         />
       )}
 
-      {/* Step 3 – Scan button */}
+      {/* Step 4 – Scan button */}
       <ScanButton
         onClick={handleScan}
         loading={isScanning}
-        disabled={!apiKey.trim() || isUnsubscribing || showResults || noCategorySelected}
+        disabled={!apiKey.trim() || !gmailConnected || isUnsubscribing || showResults || noCategorySelected}
       />
 
       {phase === 'idle' && (

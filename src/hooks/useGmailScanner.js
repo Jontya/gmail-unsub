@@ -1,12 +1,13 @@
 import { parseClaudeJSON } from '../utils/parseResponse';
 
-const API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-20250514';
-const MCP_SERVER = {
+const API_URL = '/anthropic/v1/messages';
+const MODEL = 'claude-sonnet-4-6';
+const mcpServer = (authToken) => ({
   type: 'url',
   url: 'https://gmailmcp.googleapis.com/mcp/v1',
   name: 'gmail',
-};
+  ...(authToken ? { authorization_token: authToken } : {}),
+});
 
 const CATEGORY_OPERATORS = {
   primary:    'category:primary',
@@ -58,7 +59,7 @@ function buildUserMessage(emailCount, categories) {
   return `Scan my Gmail ${inboxLabel} and find all mailing lists I am subscribed to in the last ${emailCount} emails. Return the JSON array only.`;
 }
 
-export async function scanInbox(apiKey, emailCount = 100, categories = { primary: true, promotions: true, social: true, updates: true }) {
+export async function scanInbox(apiKey, googleToken, emailCount = 100, categories = { primary: true, promotions: true, social: true, updates: true }) {
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: {
@@ -66,13 +67,14 @@ export async function scanInbox(apiKey, emailCount = 100, categories = { primary
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
       'anthropic-beta': 'mcp-client-2025-04-04',
+      'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 4000,
       system: buildSystemPrompt(emailCount, categories),
       messages: [{ role: 'user', content: buildUserMessage(emailCount, categories) }],
-      mcp_servers: [MCP_SERVER],
+      mcp_servers: [mcpServer(googleToken)],
     }),
   });
 
