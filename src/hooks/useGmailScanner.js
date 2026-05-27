@@ -8,7 +8,35 @@ const MCP_SERVER = {
   name: 'gmail',
 };
 
-const SYSTEM_PROMPT = `You are a Gmail assistant. Search the user's Gmail inbox for emails that contain List-Unsubscribe headers. Look through at least the last 100 emails. Deduplicate by sender domain. Return ONLY a valid JSON array (no markdown, no explanation) with this exact structure:
+const CATEGORY_OPERATORS = {
+  primary:    'category:primary',
+  promotions: 'category:promotions',
+  social:     'category:social',
+  updates:    'category:updates',
+};
+
+function buildSystemPrompt(emailCount, categories) {
+  const selectedKeys = Object.entries(categories)
+    .filter(([, on]) => on)
+    .map(([key]) => key);
+
+  // Build the Gmail search query for the categories
+  const allKeys = Object.keys(CATEGORY_OPERATORS);
+  const allSelected = selectedKeys.length === allKeys.length;
+
+  let categoryInstruction;
+  if (allSelected || selectedKeys.length === 0) {
+    categoryInstruction = 'Search across all Gmail inbox categories (Primary, Promotions, Social, and Updates).';
+  } else {
+    const operators = selectedKeys.map((k) => CATEGORY_OPERATORS[k]);
+    const query = operators.length === 1
+      ? operators[0]
+      : `(${operators.join(' OR ')})`;
+    const labels = selectedKeys.map((k) => k.charAt(0).toUpperCase() + k.slice(1)).join(', ');
+    categoryInstruction = `Search ONLY in these Gmail categories: ${labels}. Use the Gmail search query: ${query}`;
+  }
+
+  return `You are a Gmail assistant. Search the user's Gmail inbox for emails that contain List-Unsubscribe headers. ${categoryInstruction} Look through the last ${emailCount} emails. Deduplicate by sender domain. Return ONLY a valid JSON array (no markdown, no explanation) with this exact structure:
 [{
   "id": "string (unique)",
   "senderName": "string",
@@ -18,10 +46,19 @@ const SYSTEM_PROMPT = `You are a Gmail assistant. Search the user's Gmail inbox 
   "unsubscribeMethod": "email | url | unknown",
   "unsubscribeValue": "string (the mailto or URL)"
 }]`;
+}
 
-const USER_MESSAGE = 'Scan my Gmail inbox and find all mailing lists I am subscribed to. Return the JSON array only.';
+function buildUserMessage(emailCount, categories) {
+  const selectedKeys = Object.entries(categories)
+    .filter(([, on]) => on)
+    .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1));
+  const inboxLabel = selectedKeys.length === 4 || selectedKeys.length === 0
+    ? 'all inbox categories'
+    : selectedKeys.join(', ');
+  return `Scan my Gmail ${inboxLabel} and find all mailing lists I am subscribed to in the last ${emailCount} emails. Return the JSON array only.`;
+}
 
-export async function scanInbox(apiKey) {
+export async function scanInbox(apiKey, emailCount = 100, categories = { primary: true, promotions: true, social: true, updates: true }) {
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: {
@@ -33,8 +70,8 @@ export async function scanInbox(apiKey) {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 4000,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: USER_MESSAGE }],
+      system: buildSystemPrompt(emailCount, categories),
+      messages: [{ role: 'user', content: buildUserMessage(emailCount, categories) }],
       mcp_servers: [MCP_SERVER],
     }),
   });

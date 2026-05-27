@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 
 import Header from './components/Header';
 import ApiKeyInput from './components/ApiKeyInput';
+import ScanOptions from './components/ScanOptions';
 import ScanButton from './components/ScanButton';
 import ResultsHeader from './components/ResultsHeader';
 import MailingListCard from './components/MailingListCard';
@@ -21,6 +22,8 @@ const INITIAL_STATE = {
   lists: [],
   toast: null,
   keyError: '',
+  emailCount: 100,
+  categories: { primary: true, promotions: true, social: true, updates: true },
 };
 
 export default function App() {
@@ -50,7 +53,7 @@ export default function App() {
     update({ keyError: '', phase: 'scanning' });
 
     try {
-      const lists = await scanInbox(apiKey.trim());
+      const lists = await scanInbox(apiKey.trim(), state.emailCount, state.categories);
       update({ phase: 'results', lists });
     } catch (err) {
       update({ phase: 'idle' });
@@ -138,8 +141,17 @@ export default function App() {
     setState({ ...INITIAL_STATE });
   }
 
+  // ── Category toggle ─────────────────────────────────────────────────────────
+  function toggleCategory(key) {
+    setState((s) => ({
+      ...s,
+      categories: { ...s.categories, [key]: !s.categories[key] },
+    }));
+  }
+
   // ── Derived ─────────────────────────────────────────────────────────────────
-  const { apiKey, phase, lists, toast, keyError } = state;
+  const { apiKey, phase, lists, toast, keyError, emailCount, categories } = state;
+  const noCategorySelected = Object.values(categories).every((v) => !v);
   const pendingLists = lists.filter((l) => l.status === 'pending');
   const checkedCount = pendingLists.filter((l) => l.checked).length;
   const allChecked   = pendingLists.length > 0 && pendingLists.every((l) => l.checked);
@@ -162,11 +174,22 @@ export default function App() {
         disabled={isScanning || isUnsubscribing}
       />
 
-      {/* Step 2 – Scan button */}
+      {/* Step 2 – Scan options */}
+      {!showResults && (
+        <ScanOptions
+          emailCount={emailCount}
+          onEmailCountChange={(v) => update({ emailCount: v })}
+          categories={categories}
+          onCategoryToggle={toggleCategory}
+          disabled={isScanning}
+        />
+      )}
+
+      {/* Step 3 – Scan button */}
       <ScanButton
         onClick={handleScan}
         loading={isScanning}
-        disabled={!apiKey.trim() || isUnsubscribing || showResults}
+        disabled={!apiKey.trim() || isUnsubscribing || showResults || noCategorySelected}
       />
 
       {phase === 'idle' && (
