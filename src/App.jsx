@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 
 import Header from './components/Header';
-import ApiKeyInput from './components/ApiKeyInput';
 import GoogleConnect from './components/GoogleConnect';
 import ScanOptions from './components/ScanOptions';
 import ScanButton from './components/ScanButton';
@@ -19,11 +18,9 @@ import './styles/global.css';
 import './styles/components.css';
 
 const INITIAL_STATE = {
-  apiKey: '',
   phase: 'idle',   // 'idle' | 'scanning' | 'results' | 'unsubscribing' | 'done'
   lists: [],
   toast: null,
-  keyError: '',
   emailCount: 100,
   categories: { primary: true, promotions: true, social: true, updates: true },
 };
@@ -45,33 +42,15 @@ export default function App() {
 
   // ── Scan ────────────────────────────────────────────────────────────────────
   async function handleScan() {
-    const { apiKey } = state;
-    if (!apiKey.trim()) {
-      update({ keyError: 'Please enter your Anthropic API key.' });
-      return;
-    }
-    if (!apiKey.trim().startsWith('sk-')) {
-      update({ keyError: 'API key should start with "sk-".' });
-      return;
-    }
-    update({ keyError: '', phase: 'scanning' });
-
+    update({ phase: 'scanning' });
     try {
-      const lists = await scanInbox(apiKey.trim(), googleToken, state.emailCount, state.categories);
+      const lists = await scanInbox(googleToken, state.emailCount, state.categories);
       update({ phase: 'results', lists });
     } catch (err) {
       update({ phase: 'idle' });
       const msg = err.message || 'Unknown error';
       console.error('[scan error]', msg);
-      // Only treat as an API key error when Anthropic explicitly says so
-      const isKeyError =
-        msg.toLowerCase().includes('invalid x-api-key') ||
-        (msg.toLowerCase().includes('api_key') && !msg.toLowerCase().includes('mcp'));
-      if (isKeyError) {
-        update({ keyError: 'Invalid API key. Please check and try again.' });
-      } else {
-        showToast(`Scan failed: ${msg}`);
-      }
+      showToast(`Scan failed: ${msg}`);
     }
   }
 
@@ -104,7 +83,6 @@ export default function App() {
 
     update({ phase: 'unsubscribing' });
 
-    // Mark all selected as processing
     setState((s) => ({
       ...s,
       lists: s.lists.map((item) =>
@@ -114,10 +92,9 @@ export default function App() {
       ),
     }));
 
-    // Sequential processing
     for (const item of selected) {
       try {
-        const result = await unsubscribeOne(state.apiKey.trim(), googleToken, item);
+        const result = await unsubscribeOne(googleToken, item);
         setState((s) => ({
           ...s,
           lists: s.lists.map((li) =>
@@ -155,14 +132,14 @@ export default function App() {
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────────
-  const { apiKey, phase, lists, toast, keyError, emailCount, categories } = state;
+  const { phase, lists, toast, emailCount, categories } = state;
+  const gmailConnected  = Boolean(googleToken);
   const noCategorySelected = Object.values(categories).every((v) => !v);
-  const gmailConnected = Boolean(googleToken);
-  const pendingLists = lists.filter((l) => l.status === 'pending');
-  const checkedCount = pendingLists.filter((l) => l.checked).length;
-  const allChecked   = pendingLists.length > 0 && pendingLists.every((l) => l.checked);
-  const successCount = lists.filter((l) => l.status === 'success').length;
-  const failCount    = lists.filter((l) => l.status === 'failed').length;
+  const pendingLists    = lists.filter((l) => l.status === 'pending');
+  const checkedCount    = pendingLists.filter((l) => l.checked).length;
+  const allChecked      = pendingLists.length > 0 && pendingLists.every((l) => l.checked);
+  const successCount    = lists.filter((l) => l.status === 'success').length;
+  const failCount       = lists.filter((l) => l.status === 'failed').length;
 
   const isScanning      = phase === 'scanning';
   const isUnsubscribing = phase === 'unsubscribing';
@@ -172,15 +149,7 @@ export default function App() {
     <div className="app-layout">
       <Header />
 
-      {/* Step 1 – API key */}
-      <ApiKeyInput
-        value={apiKey}
-        onChange={(v) => update({ apiKey: v, keyError: '' })}
-        error={keyError}
-        disabled={isScanning || isUnsubscribing}
-      />
-
-      {/* Step 2 – Gmail OAuth */}
+      {/* Step 1 – Gmail OAuth */}
       <GoogleConnect
         token={googleToken}
         loading={googleLoading}
@@ -191,7 +160,7 @@ export default function App() {
         disabled={isScanning || isUnsubscribing}
       />
 
-      {/* Step 3 – Scan options */}
+      {/* Step 2 – Scan options */}
       {!showResults && (
         <ScanOptions
           emailCount={emailCount}
@@ -202,16 +171,16 @@ export default function App() {
         />
       )}
 
-      {/* Step 4 – Scan button */}
+      {/* Step 3 – Scan button */}
       <ScanButton
         onClick={handleScan}
         loading={isScanning}
-        disabled={!apiKey.trim() || !gmailConnected || isUnsubscribing || showResults || noCategorySelected}
+        disabled={!gmailConnected || isUnsubscribing || showResults || noCategorySelected}
       />
 
       {phase === 'idle' && (
         <p className="scan-hint">
-          You&apos;ll be asked to connect Gmail via Google OAuth when the MCP server initialises
+          Connect Gmail above, then scan to find mailing lists in your inbox.
         </p>
       )}
 

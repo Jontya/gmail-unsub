@@ -1,13 +1,6 @@
-import { parseClaudeJSON } from '../utils/parseResponse';
+import { parseFrom, parseUnsubscribeHeader } from '../utils/emailParsing';
 
-const API_URL = '/anthropic/v1/messages';
-const MODEL = 'claude-sonnet-4-6';
-const mcpServer = (authToken) => ({
-  type: 'url',
-  url: 'https://gmailmcp.googleapis.com/mcp/v1',
-  name: 'gmail',
-  ...(authToken ? { authorization_token: authToken } : {}),
-});
+const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 const CATEGORY_OPERATORS = {
   primary:    'category:primary',
@@ -16,86 +9,114 @@ const CATEGORY_OPERATORS = {
   updates:    'category:updates',
 };
 
-function buildSystemPrompt(emailCount, categories) {
-  const selectedKeys = Object.entries(categories)
-    .filter(([, on]) => on)
-    .map(([key]) => key);
-
-  // Build the Gmail search query for the categories
-  const allKeys = Object.keys(CATEGORY_OPERATORS);
-  const allSelected = selectedKeys.length === allKeys.length;
-
-  let categoryInstruction;
-  if (allSelected || selectedKeys.length === 0) {
-    categoryInstruction = 'Search across all Gmail inbox categories (Primary, Promotions, Social, and Updates).';
-  } else {
-    const operators = selectedKeys.map((k) => CATEGORY_OPERATORS[k]);
-    const query = operators.length === 1
-      ? operators[0]
-      : `(${operators.join(' OR ')})`;
-    const labels = selectedKeys.map((k) => k.charAt(0).toUpperCase() + k.slice(1)).join(', ');
-    categoryInstruction = `Search ONLY in these Gmail categories: ${labels}. Use the Gmail search query: ${query}`;
-  }
-
-  return `You are a Gmail assistant. Search the user's Gmail inbox for emails that contain List-Unsubscribe headers. ${categoryInstruction} Look through the last ${emailCount} emails. Deduplicate by sender domain. Return ONLY a valid JSON array (no markdown, no explanation) with this exact structure:
-[{
-  "id": "string (unique)",
-  "senderName": "string",
-  "senderEmail": "string",
-  "domain": "string",
-  "exampleSubject": "string",
-  "unsubscribeMethod": "email | url | unknown",
-  "unsubscribeValue": "string (the mailto or URL)"
-}]`;
-}
-
-function buildUserMessage(emailCount, categories) {
-  const selectedKeys = Object.entries(categories)
-    .filter(([, on]) => on)
-    .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1));
-  const inboxLabel = selectedKeys.length === 4 || selectedKeys.length === 0
-    ? 'all inbox categories'
-    : selectedKeys.join(', ');
-  return `Scan my Gmail ${inboxLabel} and find all mailing lists I am subscribed to in the last ${emailCount} emails. Return the JSON array only.`;
-}
-
-export async function scanInbox(apiKey, googleToken, emailCount = 100, categories = { primary: true, promotions: true, social: true, updates: true }) {
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'mcp-client-2025-04-04',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 4000,
-      system: buildSystemPrompt(emailCount, categories),
-      messages: [{ role: 'user', content: buildUserMessage(emailCount, categories) }],
-      mcp_servers: [mcpServer(googleToken)],
-    }),
+async function gmailFetch(path, token) {
+  const r = await fetch(`${GMAIL}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body?.error?.message || `Gmail API error ${r.status}`);
+  }
+  return r.json();
+}
 
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const msg = body?.error?.message || `HTTP ${response.status}`;
-    throw new Error(msg);
+async function fetchMessageIds(token, q, maxCount) {
+  const ids = [];
+  let pageToken = null;
+
+  while (ids.length < maxCount) {
+    const remaining = maxCount - ids.length;
+    const params = new URLSearchParams({ q, maxResults: Math.min(remaining, 500) });
+    if (pageToken) params.set('pageToken', pageToken);
+
+    const data = await gmailFetch(`/messages?${params}`, token);
+    ids.push(...(data.messages || []));
+    pageToken = data.nextPageToken;
+    if (!pageToken || !data.messages?.length) break;
   }
 
-  const body = await response.json();
-  const { data, error } = parseClaudeJSON(body.content);
+  return ids.slice(0, maxCount);
+}
 
-  if (error) throw new Error(error);
-  if (!Array.isArray(data)) throw new Error('Unexpected response shape — expected a JSON array.');
+// Fetch full message metadata (all headers) in parallel batches
+async function fetchMetadataBatch(token, messageIds, batchSize = 10) {
+  const results = [];
+  for (let i = 0; i < messageIds.length; i += batchSize) {
+    const batch = messageIds.slice(i, i + batchSize);
+    const details = await Promise.all(
+      batch.map(({ id }) =>
+        // format=metadata without metadataHeaders restriction returns ALL headers
+        gmailFetch(`/messages/${id}?format=metadata`, token).catch(() => null)
+      )
+    );
+    results.push(...details.filter(Boolean));
+  }
+  return results;
+}
 
-  // Normalise items and add UI state fields
-  return data.map((item, idx) => ({
-    ...item,
-    id: item.id ?? `item-${idx}`,
-    checked: false,
-    status: 'pending',
-    statusMessage: '',
-  }));
+export async function scanInbox(
+  googleToken,
+  emailCount = 100,
+  categories = { primary: true, promotions: true, social: true, updates: true }
+) {
+  const selected = Object.entries(categories).filter(([, on]) => on).map(([k]) => k);
+  const allKeys  = Object.keys(CATEGORY_OPERATORS);
+
+  // Build search query using category operators (reliable via API).
+  // When all categories selected, search the whole inbox except sent/draft/spam/trash.
+  let q;
+  if (selected.length === 0 || selected.length === allKeys.length) {
+    q = '-in:sent -in:draft -in:spam -in:trash';
+  } else {
+    q = `(${selected.map((k) => CATEGORY_OPERATORS[k]).join(' OR ')})`;
+  }
+
+  console.log('[scan] Gmail query:', q);
+
+  const messageIds = await fetchMessageIds(googleToken, q, emailCount);
+  console.log('[scan] messages matched by query:', messageIds.length);
+
+  if (messageIds.length === 0) return [];
+
+  const messages = await fetchMetadataBatch(googleToken, messageIds);
+  console.log('[scan] metadata fetched for:', messages.length);
+
+  // Parse, filter by List-Unsubscribe header, deduplicate by sender domain
+  let withHeader = 0;
+  const domainMap = new Map();
+
+  for (const msg of messages) {
+    const headers = Object.fromEntries(
+      (msg.payload?.headers ?? []).map((h) => [h.name.toLowerCase(), h.value])
+    );
+
+    const unsubHeader = headers['list-unsubscribe'];
+    if (!unsubHeader) continue;
+    withHeader++;
+
+    const { name: senderName, email: senderEmail } = parseFrom(headers['from'] ?? '');
+    const domain = senderEmail.includes('@') ? senderEmail.split('@')[1] : senderEmail;
+    if (domainMap.has(domain)) continue;
+
+    const { method, value } = parseUnsubscribeHeader(unsubHeader);
+
+    domainMap.set(domain, {
+      id:                msg.id,
+      senderName:        senderName || domain,
+      senderEmail,
+      domain,
+      exampleSubject:    headers['subject'] ?? '(no subject)',
+      unsubscribeMethod: method,
+      unsubscribeValue:  value,
+      checked:           false,
+      status:            'pending',
+      statusMessage:     '',
+    });
+  }
+
+  console.log(
+    `[scan] ${withHeader}/${messages.length} emails had List-Unsubscribe → ${domainMap.size} unique senders`
+  );
+
+  return [...domainMap.values()];
 }

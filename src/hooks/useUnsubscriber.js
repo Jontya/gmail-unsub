@@ -1,51 +1,76 @@
-import { parseClaudeJSON } from '../utils/parseResponse';
+const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
-const API_URL = '/anthropic/v1/messages';
-const MODEL = 'claude-sonnet-4-6';
-const mcpServer = (authToken) => ({
-  type: 'url',
-  url: 'https://gmailmcp.googleapis.com/mcp/v1',
-  name: 'gmail',
-  ...(authToken ? { authorization_token: authToken } : {}),
-});
+let cachedProfileEmail = null;
 
-const SYSTEM_PROMPT = `You are a Gmail assistant. Unsubscribe the user from the given mailing list using the provided unsubscribe method. If method is 'email', compose and send an unsubscribe email to the unsubscribeValue address. If method is 'url', use Gmail MCP to note the URL (and inform the user they must visit it manually). Confirm success or failure. Reply with only valid JSON: { "success": boolean, "message": string }`;
-
-export async function unsubscribeOne(apiKey, googleToken, item) {
-  const { senderName, senderEmail, unsubscribeMethod, unsubscribeValue } = item;
-  const userMessage = `Unsubscribe me from ${senderName} (${senderEmail}). Unsubscribe method: ${unsubscribeMethod}. Unsubscribe value: ${unsubscribeValue}`;
-
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'mcp-client-2025-04-04',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }],
-      mcp_servers: [mcpServer(googleToken)],
-    }),
+async function getProfileEmail(token) {
+  if (cachedProfileEmail) return cachedProfileEmail;
+  const r = await fetch(`${GMAIL}/profile`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
+  const data = await r.json();
+  cachedProfileEmail = data.emailAddress;
+  return cachedProfileEmail;
+}
 
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const msg = body?.error?.message || `HTTP ${response.status}`;
-    throw new Error(msg);
+/**
+ * Encode a plain-text email as base64url for the Gmail API.
+ */
+function encodeEmail(to, from, subject, body) {
+  const raw = [
+    `To: ${to}`,
+    `From: ${from}`,
+    `Subject: ${subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/plain; charset=utf-8`,
+    '',
+    body,
+  ].join('\r\n');
+
+  // TextEncoder handles non-ASCII safely
+  const bytes = new TextEncoder().encode(raw);
+  let binary = '';
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export async function unsubscribeOne(googleToken, item) {
+  const { unsubscribeMethod, unsubscribeValue, senderName } = item;
+  // Reset cached email between sessions (token changes)
+  cachedProfileEmail = null;
+
+  if (unsubscribeMethod === 'email') {
+    const from  = await getProfileEmail(googleToken);
+    const raw   = encodeEmail(
+      unsubscribeValue,
+      from,
+      'Unsubscribe',
+      'Please remove me from your mailing list.\r\n\r\nThank you.'
+    );
+
+    const r = await fetch(`${GMAIL}/messages/send`, {
+      method: 'POST',
+      headers: {
+        Authorization:  `Bearer ${googleToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ raw }),
+    });
+
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err?.error?.message || 'Failed to send unsubscribe email.');
+    }
+
+    return { success: true, message: `Unsubscribe email sent to ${unsubscribeValue}` };
   }
 
-  const body = await response.json();
-  const { data, error } = parseClaudeJSON(body.content);
+  if (unsubscribeMethod === 'url') {
+    window.open(unsubscribeValue, '_blank', 'noopener,noreferrer');
+    return {
+      success: true,
+      message: `Unsubscribe page opened for ${senderName} — confirm on the page if required`,
+    };
+  }
 
-  if (error) throw new Error(error);
-
-  return {
-    success: Boolean(data?.success),
-    message: data?.message || (data?.success ? 'Unsubscribed successfully.' : 'Unsubscribe may have failed.'),
-  };
+  return { success: false, message: 'Unknown unsubscribe method.' };
 }
