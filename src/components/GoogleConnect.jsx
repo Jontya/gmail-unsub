@@ -60,6 +60,15 @@ export default function GoogleConnect({ token, loading, error, gisReady, onConne
             autoComplete="off"
             spellCheck={false}
           />
+          {clientId && !disabled && !loading && (
+            <button
+              type="button"
+              className="google-connect__forget"
+              onClick={() => { localStorage.removeItem('googleClientId'); setClientId(''); }}
+            >
+              forget this
+            </button>
+          )}
           <p className="google-connect__hint">
             Create a project at{' '}
             <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer">
