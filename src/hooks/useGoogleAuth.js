@@ -31,6 +31,27 @@ export function useGoogleAuth() {
     return () => clearInterval(id);
   }, []);
 
+  // Silent token re-issue for returning users
+  useEffect(() => {
+    if (!gisReady) return;
+    const savedClientId = localStorage.getItem('googleClientId');
+    if (!savedClientId) return;
+
+    setLoading(true);
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: savedClientId,
+      scope: GMAIL_SCOPES,
+      callback: (resp) => {
+        setLoading(false);
+        if (!resp.error) {
+          setToken(resp.access_token);
+          setTokenExpiry(Date.now() + resp.expires_in * 1000);
+        }
+      },
+    });
+    client.requestAccessToken({ prompt: '' });
+  }, [gisReady]);
+
   const connect = useCallback((clientId) => {
     if (!clientId?.trim()) {
       setError('Enter your Google Client ID first.');
