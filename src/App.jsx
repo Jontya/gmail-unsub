@@ -10,8 +10,8 @@ import UnsubscribeBar from './components/UnsubscribeBar';
 import EmptyState from './components/EmptyState';
 import Toast from './components/Toast';
 
-import { scanInbox } from './hooks/useGmailScanner';
-import { unsubscribeOne, fetchProfileEmail } from './hooks/useUnsubscriber';
+import { scanInbox } from './services/gmailScanner';
+import { unsubscribeOne, fetchProfileEmail } from './services/unsubscriber';
 import { useGoogleAuth } from './hooks/useGoogleAuth';
 
 import './styles/global.css';
