@@ -61,9 +61,10 @@ export function useGoogleAuth() {
   }, [gisReady]);
 
   const disconnect = useCallback(() => {
+    if (token) window.google?.accounts?.oauth2?.revoke(token);
     setToken(null);
     setTokenExpiry(null);
-  }, []);
+  }, [token]);
 
   return { token, tokenExpiry, loading, error, gisReady, connect, disconnect };
 }
