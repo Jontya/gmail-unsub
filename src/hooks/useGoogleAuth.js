@@ -5,16 +5,36 @@ const GMAIL_SCOPES = [
   'https://www.googleapis.com/auth/gmail.send',
 ].join(' ');
 
-/**
- * Manages Google OAuth via the Google Identity Services library.
- * Provides an access token suitable for passing to Gmail MCP.
- */
+const SESSION_KEY = 'gmail_unsub_session';
+
+function saveSession(accessToken, expiry) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ accessToken, expiry }));
+  } catch {}
+}
+
+function loadSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const { accessToken, expiry } = JSON.parse(raw);
+    if (Date.now() >= expiry - 60_000) return null; // treat as expired if <60s left
+    return { accessToken, expiry };
+  } catch {
+    return null;
+  }
+}
+
+function clearSession() {
+  try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+}
+
 export function useGoogleAuth() {
-  const [token, setToken]           = useState(null);
+  const [token, setToken]             = useState(null);
   const [tokenExpiry, setTokenExpiry] = useState(null);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState('');
-  const [gisReady, setGisReady]     = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
+  const [gisReady, setGisReady]       = useState(false);
 
   // Poll until the async GIS script has loaded
   useEffect(() => {
@@ -25,32 +45,20 @@ export function useGoogleAuth() {
         setGisReady(true);
         clearInterval(id);
       } else if (++ticks > 30) {
-        clearInterval(id); // Give up after ~6 s
+        clearInterval(id);
       }
     }, 200);
     return () => clearInterval(id);
   }, []);
 
-  // Silent token re-issue for returning users
+  // Restore session from sessionStorage on load — no popup, no GIS call needed
   useEffect(() => {
-    if (!gisReady) return;
-    const savedClientId = localStorage.getItem('googleClientId');
-    if (!savedClientId) return;
-
-    setLoading(true);
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: savedClientId,
-      scope: GMAIL_SCOPES,
-      callback: (resp) => {
-        setLoading(false);
-        if (!resp.error) {
-          setToken(resp.access_token);
-          setTokenExpiry(Date.now() + resp.expires_in * 1000);
-        }
-      },
-    });
-    client.requestAccessToken({ prompt: '' });
-  }, [gisReady]);
+    const session = loadSession();
+    if (session) {
+      setToken(session.accessToken);
+      setTokenExpiry(session.expiry);
+    }
+  }, []);
 
   const connect = useCallback((clientId) => {
     if (!clientId?.trim()) {
@@ -73,8 +81,10 @@ export function useGoogleAuth() {
           setError(resp.error_description || resp.error);
           return;
         }
+        const expiry = Date.now() + resp.expires_in * 1000;
         setToken(resp.access_token);
-        setTokenExpiry(Date.now() + resp.expires_in * 1000);
+        setTokenExpiry(expiry);
+        saveSession(resp.access_token, expiry);
       },
     });
 
@@ -85,6 +95,7 @@ export function useGoogleAuth() {
     if (token) window.google?.accounts?.oauth2?.revoke(token);
     setToken(null);
     setTokenExpiry(null);
+    clearSession();
   }, [token]);
 
   return { token, tokenExpiry, loading, error, gisReady, connect, disconnect };

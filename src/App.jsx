@@ -155,6 +155,16 @@ export default function App() {
     setState({ ...INITIAL_STATE });
   }
 
+  // ── Scan Again ───────────────────────────────────────────────────────────────
+  function handleScanAgain() {
+    setState((s) => ({
+      ...INITIAL_STATE,
+      emailCount: s.emailCount,
+      categories: s.categories,
+      showPreviouslyUnsubscribed: s.showPreviouslyUnsubscribed,
+    }));
+  }
+
   // ── Verify unsubscribes ──────────────────────────────────────────────────────
   async function handleVerify() {
     if (guardToken()) return;
@@ -220,13 +230,19 @@ export default function App() {
         />
       )}
 
-      {/* Step 3 – Scan button */}
-      <ScanButton
-        onClick={handleScan}
-        loading={isScanning}
-        disabled={!gmailConnected || isUnsubscribing || showResults || noCategorySelected}
-        progress={scanProgress}
-      />
+      {/* Step 3 – Scan / Scan Again */}
+      {phase === 'results' ? (
+        <button className="scan-btn" onClick={handleScanAgain} type="button">
+          Scan Again
+        </button>
+      ) : (
+        <ScanButton
+          onClick={handleScan}
+          loading={isScanning}
+          disabled={!gmailConnected || isUnsubscribing || showResults || noCategorySelected}
+          progress={scanProgress}
+        />
+      )}
 
       {phase === 'idle' && (
         <p className="scan-hint">
