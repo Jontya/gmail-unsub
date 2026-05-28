@@ -1,13 +1,16 @@
-import { parseFrom, parseUnsubscribeHeader } from '../utils/emailParsing';
+import { parseFrom, parseUnsubscribeHeader, scoreMessage } from '../utils/emailParsing';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
-const CATEGORY_OPERATORS = {
-  primary:    'category:primary',
-  promotions: 'category:promotions',
-  social:     'category:social',
-  updates:    'category:updates',
-};
+const METADATA_HEADERS = [
+  'List-Unsubscribe',
+  'List-Unsubscribe-Post',
+  'From',
+  'Subject',
+  'Precedence',
+  'X-Mailer',
+  'Return-Path',
+];
 
 async function gmailFetch(path, token) {
   const r = await fetch(`${GMAIL}${path}`, {
@@ -38,15 +41,17 @@ async function fetchMessageIds(token, q, maxCount) {
   return ids.slice(0, maxCount);
 }
 
-// Fetch full message metadata (all headers) in parallel batches
+// Fetch message metadata for the specific headers needed for scoring/parsing
 async function fetchMetadataBatch(token, messageIds, batchSize = 10) {
   const results = [];
+  const params = new URLSearchParams({ format: 'metadata' });
+  METADATA_HEADERS.forEach((h) => params.append('metadataHeaders', h));
+
   for (let i = 0; i < messageIds.length; i += batchSize) {
     const batch = messageIds.slice(i, i + batchSize);
     const details = await Promise.all(
       batch.map(({ id }) =>
-        // format=metadata without metadataHeaders restriction returns ALL headers
-        gmailFetch(`/messages/${id}?format=metadata`, token).catch(() => null)
+        gmailFetch(`/messages/${id}?${params}`, token).catch(() => null)
       )
     );
     results.push(...details.filter(Boolean));
@@ -59,17 +64,8 @@ export async function scanInbox(
   emailCount = 100,
   categories = { primary: true, promotions: true, social: true, updates: true }
 ) {
-  const selected = Object.entries(categories).filter(([, on]) => on).map(([k]) => k);
-  const allKeys  = Object.keys(CATEGORY_OPERATORS);
-
-  // Build search query using category operators (reliable via API).
-  // When all categories selected, search the whole inbox except sent/draft/spam/trash.
-  let q;
-  if (selected.length === 0 || selected.length === allKeys.length) {
-    q = '-in:sent -in:draft -in:spam -in:trash';
-  } else {
-    q = `(${selected.map((k) => CATEGORY_OPERATORS[k]).join(' OR ')})`;
-  }
+  // Always restrict to promotional mail that advertises an unsubscribe mechanism.
+  const q = 'category:promotions has:list-unsubscribe';
 
   console.log('[scan] Gmail query:', q);
 
@@ -93,6 +89,8 @@ export async function scanInbox(
     const unsubHeader = headers['list-unsubscribe'];
     if (!unsubHeader) continue;
     withHeader++;
+
+    if (scoreMessage(headers) === 0) continue;
 
     const { name: senderName, email: senderEmail } = parseFrom(headers['from'] ?? '');
     const domain = senderEmail.includes('@') ? senderEmail.split('@')[1] : senderEmail;
