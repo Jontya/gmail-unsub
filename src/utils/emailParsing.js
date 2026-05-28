@@ -56,7 +56,9 @@ export function parseUnsubscribeHeader(value = '', postHeader = '') {
 
   for (const p of parts) {
     if (p.toLowerCase().startsWith('mailto:')) {
-      return { method: 'email', value: p.slice(7).trim(), oneClick };
+      // Strip query params (e.g. ?subject=Unsubscribe) — only the address is needed
+      const emailAddress = p.slice(7).split('?')[0].trim();
+      return { method: 'email', value: emailAddress, oneClick };
     }
   }
   for (const p of parts) {

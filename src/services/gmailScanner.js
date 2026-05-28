@@ -82,6 +82,21 @@ async function fetchMetadataBatch(token, messageIds, onProgress, batchSize = 10)
   return results;
 }
 
+const CATEGORY_KEYS = ['primary', 'promotions', 'social', 'updates'];
+
+function buildQuery(categories) {
+  const selected = CATEGORY_KEYS.filter((k) => categories[k]);
+  // All (or none) selected → search entire inbox with no category restriction
+  if (selected.length === 0 || selected.length === CATEGORY_KEYS.length) {
+    return 'in:inbox';
+  }
+  if (selected.length === 1) {
+    return `category:${selected[0]}`;
+  }
+  // Gmail OR syntax: {term1 term2}
+  return `{${selected.map((k) => `category:${k}`).join(' ')}}`;
+}
+
 export async function scanInbox(
   googleToken,
   emailCount = 100,
@@ -89,8 +104,7 @@ export async function scanInbox(
   onProgress = () => {},
   showPreviouslyUnsubscribed = false
 ) {
-  // Always restrict to promotional mail that advertises an unsubscribe mechanism.
-  const q = 'category:promotions has:list-unsubscribe';
+  const q = buildQuery(categories);
 
   console.log('[scan] Gmail query:', q);
 

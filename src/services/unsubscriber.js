@@ -62,15 +62,15 @@ export async function unsubscribeOne(googleToken, item, profileEmail) {
 
   if (unsubscribeMethod === 'url') {
     if (oneClick) {
-      const r = await fetch(unsubscribeValue, {
+      // mode: 'no-cors' — third-party servers don't set CORS headers, but the POST
+      // still reaches them (servers respond 200/202). We can't read the opaque
+      // response, so we treat send-without-network-error as success.
+      await fetch(unsubscribeValue, {
         method: 'POST',
+        mode: 'no-cors',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'List-Unsubscribe=One-Click',
       });
-
-      if (!r.ok) {
-        throw new Error(`One-click unsubscribe failed (HTTP ${r.status})`);
-      }
 
       saveToHistory(item);
       return { success: true, message: `One-click unsubscribe sent to ${senderName}` };
