@@ -1,16 +1,46 @@
-# React + Vite
+# Gmail Unsubscriber
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A browser app that scans your Gmail inbox for mailing list emails and lets you unsubscribe from them in bulk.
 
-Currently, two official plugins are available:
+## What it does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Connects to your Gmail account via Google OAuth.
+2. Scans a configurable number of recent emails across selected inbox categories.
+3. Detects emails with a `List-Unsubscribe` header and groups them by sender domain.
+4. Displays each unique sender as a card you can select.
+5. Unsubscribes from selected senders, either by sending an unsubscribe email or opening the unsubscribe URL.
 
-## React Compiler
+You can run multiple rounds of unsubscribing in a single session. Processed senders stay visible but inactive, while any remaining pending senders stay selectable.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech stack
 
-## Expanding the ESLint configuration
+- React 19 and Vite
+- Gmail REST API (messages.list, messages.get, messages.send, users.getProfile)
+- Google Identity Services for browser OAuth token flow
+- Plain CSS with a Liquid Glass design aesthetic
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Setup
+
+### Google Cloud project
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com) and create a project.
+2. Enable the **Gmail API** for the project.
+3. Under **APIs and Services > Credentials**, create an OAuth 2.0 Client ID with application type **Web application**.
+4. Add `http://localhost:5173` to the list of authorised JavaScript origins.
+5. Under **APIs and Services > OAuth consent screen**, add your Gmail address as a test user.
+
+### Running locally
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173` in your browser, paste your OAuth Client ID into the app, and connect your Gmail account.
+
+### Building for production
+
+```bash
+npm run build
+npm run preview
+```
