@@ -57,7 +57,7 @@ export async function unsubscribeOne(googleToken, item, profileEmail) {
     }
 
     saveToHistory(item);
-    return { success: true, message: `Unsubscribe email sent to ${unsubscribeValue}` };
+    return { success: true, message: `Unsubscribe email sent to ${senderName}` };
   }
 
   if (unsubscribeMethod === 'url') {
