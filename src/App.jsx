@@ -10,7 +10,7 @@ import UnsubscribeBar from './components/UnsubscribeBar';
 import EmptyState from './components/EmptyState';
 import Toast from './components/Toast';
 
-import { scanInbox } from './services/gmailScanner';
+import { scanInbox, verifyUnsubscribes } from './services/gmailScanner';
 import { unsubscribeOne, fetchProfileEmail } from './services/unsubscriber';
 import { useGoogleAuth } from './hooks/useGoogleAuth';
 
@@ -23,7 +23,8 @@ const INITIAL_STATE = {
   toast: null,
   emailCount: 100,
   categories: { primary: true, promotions: true, social: true, updates: true },
-  scanProgress: null, // { fetched, total } while scanning, null otherwise
+  scanProgress: null,    // { fetched, total } while scanning, null otherwise
+  verification: null,    // null | { status: 'verifying'|'done', results: [] }
 };
 
 export default function App() {
@@ -122,7 +123,8 @@ export default function App() {
           ...s,
           lists: s.lists.map((li) =>
             li.id === item.id
-              ? { ...li, status: result.success ? 'success' : 'failed', statusMessage: result.message }
+              ? { ...li, status: result.success ? 'success' : 'failed', statusMessage: result.message,
+                  ...(result.success && { unsubscribedAt: Date.now() }) }
               : li
           ),
         }));
@@ -151,6 +153,20 @@ export default function App() {
     setState({ ...INITIAL_STATE });
   }
 
+  // ── Verify unsubscribes ──────────────────────────────────────────────────────
+  async function handleVerify() {
+    if (guardToken()) return;
+    const successItems = state.lists.filter((l) => l.status === 'success');
+    update({ verification: { status: 'verifying', results: [] } });
+    try {
+      const results = await verifyUnsubscribes(googleToken, successItems);
+      update({ verification: { status: 'done', results } });
+    } catch (err) {
+      update({ verification: null });
+      showToast(`Verification failed: ${err.message || 'Unknown error'}`);
+    }
+  }
+
   // ── Category toggle ─────────────────────────────────────────────────────────
   function toggleCategory(key) {
     setState((s) => ({
@@ -160,7 +176,7 @@ export default function App() {
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────────
-  const { phase, lists, toast, emailCount, categories, scanProgress } = state;
+  const { phase, lists, toast, emailCount, categories, scanProgress, verification } = state;
   const gmailConnected  = Boolean(googleToken);
   const noCategorySelected = Object.values(categories).every((v) => !v);
   const pendingLists    = lists.filter((l) => l.status === 'pending');
@@ -235,9 +251,19 @@ export default function App() {
                   <span className="summary__stat-label">Failed</span>
                 </div>
               </div>
-              <button className="summary__restart" onClick={handleRestart}>
-                Start Over
-              </button>
+              <div className="summary__actions">
+                <button className="summary__restart" onClick={handleRestart}>
+                  Start Over
+                </button>
+                {successCount > 0 && !verification && (
+                  <button className="summary__verify" onClick={handleVerify}>
+                    Verify unsubscribes
+                  </button>
+                )}
+                {verification?.status === 'verifying' && (
+                  <span className="summary__verify-loading">Checking for new emails…</span>
+                )}
+              </div>
             </div>
           ) : (
             <ResultsHeader
@@ -258,6 +284,27 @@ export default function App() {
               />
             ))}
           </div>
+
+          {phase === 'done' && verification?.status === 'done' && (
+            <ul className="verify-results">
+              {verification.results.map((r) => (
+                <li key={r.id} className="verify-results__item">
+                  <span className="verify-results__name">{r.senderName}</span>
+                  <span className={`verify-results__status${
+                    r.count === null ? '' :
+                    r.count === 0   ? ' verify-results__status--ok' :
+                                      ' verify-results__status--warn'
+                  }`}>
+                    {r.count === null
+                      ? 'Could not check'
+                      : r.count === 0
+                      ? 'No new emails — looks good'
+                      : `${r.count} new email${r.count !== 1 ? 's' : ''} found`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       )}
 

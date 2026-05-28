@@ -145,3 +145,28 @@ export async function scanInbox(
 
   return [...domainMap.values()];
 }
+
+// For each successfully unsubscribed item, search for emails from that sender
+// domain received after the unsubscribe timestamp.
+export async function verifyUnsubscribes(token, items) {
+  return Promise.all(
+    items.map(async (item) => {
+      const afterSecs = Math.floor(item.unsubscribedAt / 1000);
+      const q = `from:@${item.domain} after:${afterSecs}`;
+      try {
+        const data = await gmailFetch(
+          `/messages?${new URLSearchParams({ q, maxResults: 10 })}`,
+          token
+        );
+        return {
+          id: item.id,
+          senderName: item.senderName,
+          domain: item.domain,
+          count: (data.messages || []).length,
+        };
+      } catch {
+        return { id: item.id, senderName: item.senderName, domain: item.domain, count: null };
+      }
+    })
+  );
+}
