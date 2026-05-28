@@ -23,6 +23,7 @@ const INITIAL_STATE = {
   toast: null,
   emailCount: 100,
   categories: { primary: true, promotions: true, social: true, updates: true },
+  scanProgress: null, // { fetched, total } while scanning, null otherwise
 };
 
 export default function App() {
@@ -56,12 +57,17 @@ export default function App() {
   // ── Scan ────────────────────────────────────────────────────────────────────
   async function handleScan() {
     if (guardToken()) return;
-    update({ phase: 'scanning' });
+    update({ phase: 'scanning', scanProgress: null });
     try {
-      const lists = await scanInbox(googleToken, state.emailCount, state.categories);
-      update({ phase: 'results', lists });
+      const lists = await scanInbox(
+        googleToken,
+        state.emailCount,
+        state.categories,
+        (fetched, total) => update({ scanProgress: { fetched, total } })
+      );
+      update({ phase: 'results', lists, scanProgress: null });
     } catch (err) {
-      update({ phase: 'idle' });
+      update({ phase: 'idle', scanProgress: null });
       const msg = err.message || 'Unknown error';
       console.error('[scan error]', msg);
       showToast(`Scan failed: ${msg}`);
@@ -154,7 +160,7 @@ export default function App() {
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────────
-  const { phase, lists, toast, emailCount, categories } = state;
+  const { phase, lists, toast, emailCount, categories, scanProgress } = state;
   const gmailConnected  = Boolean(googleToken);
   const noCategorySelected = Object.values(categories).every((v) => !v);
   const pendingLists    = lists.filter((l) => l.status === 'pending');
@@ -198,6 +204,7 @@ export default function App() {
         onClick={handleScan}
         loading={isScanning}
         disabled={!gmailConnected || isUnsubscribing || showResults || noCategorySelected}
+        progress={scanProgress}
       />
 
       {phase === 'idle' && (

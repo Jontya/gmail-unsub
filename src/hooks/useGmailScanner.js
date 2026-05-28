@@ -42,7 +42,7 @@ async function fetchMessageIds(token, q, maxCount) {
 }
 
 // Fetch message metadata for the specific headers needed for scoring/parsing
-async function fetchMetadataBatch(token, messageIds, batchSize = 10) {
+async function fetchMetadataBatch(token, messageIds, onProgress, batchSize = 10) {
   const results = [];
   const params = new URLSearchParams({ format: 'metadata' });
   METADATA_HEADERS.forEach((h) => params.append('metadataHeaders', h));
@@ -55,6 +55,7 @@ async function fetchMetadataBatch(token, messageIds, batchSize = 10) {
       )
     );
     results.push(...details.filter(Boolean));
+    onProgress(results.length, messageIds.length);
   }
   return results;
 }
@@ -62,7 +63,8 @@ async function fetchMetadataBatch(token, messageIds, batchSize = 10) {
 export async function scanInbox(
   googleToken,
   emailCount = 100,
-  categories = { primary: true, promotions: true, social: true, updates: true }
+  categories = { primary: true, promotions: true, social: true, updates: true },
+  onProgress = () => {}
 ) {
   // Always restrict to promotional mail that advertises an unsubscribe mechanism.
   const q = 'category:promotions has:list-unsubscribe';
@@ -74,7 +76,7 @@ export async function scanInbox(
 
   if (messageIds.length === 0) return [];
 
-  const messages = await fetchMetadataBatch(googleToken, messageIds);
+  const messages = await fetchMetadataBatch(googleToken, messageIds, onProgress);
   console.log('[scan] metadata fetched for:', messages.length);
 
   // Parse, filter by List-Unsubscribe header, deduplicate by sender domain
