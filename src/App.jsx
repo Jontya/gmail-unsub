@@ -27,7 +27,7 @@ const INITIAL_STATE = {
 
 export default function App() {
   const [state, setState] = useState(INITIAL_STATE);
-  const { token: googleToken, loading: googleLoading, error: googleError,
+  const { token: googleToken, tokenExpiry, loading: googleLoading, error: googleError,
           gisReady, connect: connectGoogle, disconnect: disconnectGoogle } = useGoogleAuth();
 
   const update = (patch) => setState((s) => ({ ...s, ...patch }));
@@ -40,8 +40,22 @@ export default function App() {
     setState((s) => ({ ...s, toast: null }));
   }, []);
 
+  // ── Token expiry guard ───────────────────────────────────────────────────────
+  function tokenNearExpiry() {
+    if (!tokenExpiry) return false;
+    return Date.now() > tokenExpiry - 2 * 60 * 1000;
+  }
+
+  function guardToken() {
+    if (!tokenNearExpiry()) return false;
+    disconnectGoogle();
+    showToast('Session expired — please reconnect your Google account.');
+    return true;
+  }
+
   // ── Scan ────────────────────────────────────────────────────────────────────
   async function handleScan() {
+    if (guardToken()) return;
     update({ phase: 'scanning' });
     try {
       const lists = await scanInbox(googleToken, state.emailCount, state.categories);
@@ -78,6 +92,7 @@ export default function App() {
 
   // ── Unsubscribe ──────────────────────────────────────────────────────────────
   async function handleUnsubscribe() {
+    if (guardToken()) return;
     const selected = state.lists.filter((l) => l.checked && l.status === 'pending');
     if (selected.length === 0) return;
 

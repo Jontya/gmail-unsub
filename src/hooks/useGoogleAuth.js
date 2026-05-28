@@ -10,10 +10,11 @@ const GMAIL_SCOPES = [
  * Provides an access token suitable for passing to Gmail MCP.
  */
 export function useGoogleAuth() {
-  const [token, setToken]     = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const [gisReady, setGisReady] = useState(false);
+  const [token, setToken]           = useState(null);
+  const [tokenExpiry, setTokenExpiry] = useState(null);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
+  const [gisReady, setGisReady]     = useState(false);
 
   // Poll until the async GIS script has loaded
   useEffect(() => {
@@ -52,13 +53,17 @@ export function useGoogleAuth() {
           return;
         }
         setToken(resp.access_token);
+        setTokenExpiry(Date.now() + resp.expires_in * 1000);
       },
     });
 
     client.requestAccessToken();
   }, [gisReady]);
 
-  const disconnect = useCallback(() => setToken(null), []);
+  const disconnect = useCallback(() => {
+    setToken(null);
+    setTokenExpiry(null);
+  }, []);
 
-  return { token, loading, error, gisReady, connect, disconnect };
+  return { token, tokenExpiry, loading, error, gisReady, connect, disconnect };
 }
