@@ -96,7 +96,10 @@ export async function scanInbox(
     const domain = senderEmail.includes('@') ? senderEmail.split('@')[1] : senderEmail;
     if (domainMap.has(domain)) continue;
 
-    const { method, value } = parseUnsubscribeHeader(unsubHeader);
+    const { method, value, oneClick } = parseUnsubscribeHeader(
+      unsubHeader,
+      headers['list-unsubscribe-post'] ?? ''
+    );
 
     domainMap.set(domain, {
       id:                msg.id,
@@ -106,6 +109,7 @@ export async function scanInbox(
       exampleSubject:    headers['subject'] ?? '(no subject)',
       unsubscribeMethod: method,
       unsubscribeValue:  value,
+      oneClick,
       checked:           false,
       status:            'pending',
       statusMessage:     '',

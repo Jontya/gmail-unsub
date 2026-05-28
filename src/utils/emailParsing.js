@@ -45,22 +45,24 @@ export function scoreMessage(headers) {
 }
 
 /**
- * Parse a List-Unsubscribe header value into { method, value }.
+ * Parse a List-Unsubscribe header value into { method, value, oneClick }.
  * Header can contain: <mailto:unsub@example.com>, <https://example.com/unsub>
  * Prefers email method over URL.
+ * oneClick is true when List-Unsubscribe-Post declares One-Click support.
  */
-export function parseUnsubscribeHeader(value = '') {
+export function parseUnsubscribeHeader(value = '', postHeader = '') {
   const parts = [...value.matchAll(/<([^>]+)>/g)].map((m) => m[1].trim());
+  const oneClick = postHeader.includes('List-Unsubscribe=One-Click');
 
   for (const p of parts) {
     if (p.toLowerCase().startsWith('mailto:')) {
-      return { method: 'email', value: p.slice(7).trim() };
+      return { method: 'email', value: p.slice(7).trim(), oneClick };
     }
   }
   for (const p of parts) {
     if (p.startsWith('http')) {
-      return { method: 'url', value: p };
+      return { method: 'url', value: p, oneClick };
     }
   }
-  return { method: 'unknown', value: value.trim() };
+  return { method: 'unknown', value: value.trim(), oneClick };
 }

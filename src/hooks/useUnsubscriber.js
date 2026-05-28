@@ -1,15 +1,11 @@
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
-let cachedProfileEmail = null;
-
-async function getProfileEmail(token) {
-  if (cachedProfileEmail) return cachedProfileEmail;
+export async function fetchProfileEmail(token) {
   const r = await fetch(`${GMAIL}/profile`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await r.json();
-  cachedProfileEmail = data.emailAddress;
-  return cachedProfileEmail;
+  return data.emailAddress;
 }
 
 /**
@@ -33,16 +29,13 @@ function encodeEmail(to, from, subject, body) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export async function unsubscribeOne(googleToken, item) {
-  const { unsubscribeMethod, unsubscribeValue, senderName } = item;
-  // Reset cached email between sessions (token changes)
-  cachedProfileEmail = null;
+export async function unsubscribeOne(googleToken, item, profileEmail) {
+  const { unsubscribeMethod, unsubscribeValue, senderName, oneClick } = item;
 
   if (unsubscribeMethod === 'email') {
-    const from  = await getProfileEmail(googleToken);
-    const raw   = encodeEmail(
+    const raw = encodeEmail(
       unsubscribeValue,
-      from,
+      profileEmail,
       'Unsubscribe',
       'Please remove me from your mailing list.\r\n\r\nThank you.'
     );
@@ -65,6 +58,23 @@ export async function unsubscribeOne(googleToken, item) {
   }
 
   if (unsubscribeMethod === 'url') {
+    if (oneClick) {
+      const r = await fetch(unsubscribeValue, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'List-Unsubscribe=One-Click',
+      });
+
+      if (!r.ok) {
+        throw new Error(`One-click unsubscribe failed (HTTP ${r.status})`);
+      }
+
+      return { success: true, message: `One-click unsubscribe sent to ${senderName}` };
+    }
+
+    // Fallback: open tab. Delay before opening so the browser considers each
+    // call user-gesture-adjacent and does not block the popup.
+    await new Promise((resolve) => setTimeout(resolve, 500));
     window.open(unsubscribeValue, '_blank', 'noopener,noreferrer');
     return {
       success: true,

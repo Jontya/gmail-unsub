@@ -11,7 +11,7 @@ import EmptyState from './components/EmptyState';
 import Toast from './components/Toast';
 
 import { scanInbox } from './hooks/useGmailScanner';
-import { unsubscribeOne } from './hooks/useUnsubscriber';
+import { unsubscribeOne, fetchProfileEmail } from './hooks/useUnsubscriber';
 import { useGoogleAuth } from './hooks/useGoogleAuth';
 
 import './styles/global.css';
@@ -92,9 +92,11 @@ export default function App() {
       ),
     }));
 
+    const profileEmail = await fetchProfileEmail(googleToken);
+
     for (const item of selected) {
       try {
-        const result = await unsubscribeOne(googleToken, item);
+        const result = await unsubscribeOne(googleToken, item, profileEmail);
         setState((s) => ({
           ...s,
           lists: s.lists.map((li) =>
