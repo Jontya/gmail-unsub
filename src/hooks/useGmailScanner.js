@@ -41,6 +41,27 @@ async function fetchMessageIds(token, q, maxCount) {
   return ids.slice(0, maxCount);
 }
 
+const RETRY_DELAYS = [500, 1000, 2000];
+
+// Like gmailFetch but retries on 429/503 with exponential backoff, then drops on exhaustion.
+async function gmailFetchRetry(path, token) {
+  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+    const r = await fetch(`${GMAIL}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (r.ok) return r.json();
+    if (r.status === 429 || r.status === 503) {
+      if (attempt < RETRY_DELAYS.length) {
+        await new Promise((res) => setTimeout(res, RETRY_DELAYS[attempt]));
+        continue;
+      }
+      return null; // retries exhausted — drop this message
+    }
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body?.error?.message || `Gmail API error ${r.status}`);
+  }
+}
+
 // Fetch message metadata for the specific headers needed for scoring/parsing
 async function fetchMetadataBatch(token, messageIds, onProgress, batchSize = 10) {
   const results = [];
@@ -51,7 +72,7 @@ async function fetchMetadataBatch(token, messageIds, onProgress, batchSize = 10)
     const batch = messageIds.slice(i, i + batchSize);
     const details = await Promise.all(
       batch.map(({ id }) =>
-        gmailFetch(`/messages/${id}?${params}`, token).catch(() => null)
+        gmailFetchRetry(`/messages/${id}?${params}`, token).catch(() => null)
       )
     );
     results.push(...details.filter(Boolean));
