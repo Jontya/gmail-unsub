@@ -106,15 +106,11 @@ export async function scanInbox(
 ) {
   const q = buildQuery(categories);
 
-  console.log('[scan] Gmail query:', q);
-
   const messageIds = await fetchMessageIds(googleToken, q, emailCount);
-  console.log('[scan] messages matched by query:', messageIds.length);
 
   if (messageIds.length === 0) return [];
 
   const messages = await fetchMetadataBatch(googleToken, messageIds, onProgress);
-  console.log('[scan] metadata fetched for:', messages.length);
 
   // Parse, filter by List-Unsubscribe header, deduplicate by sender domain
   let withHeader = 0;
@@ -154,10 +150,6 @@ export async function scanInbox(
       statusMessage:     '',
     });
   }
-
-  console.log(
-    `[scan] ${withHeader}/${messages.length} emails had List-Unsubscribe → ${domainMap.size} unique senders`
-  );
 
   const items = [];
   for (const item of domainMap.values()) {

@@ -72,7 +72,6 @@ export default function App() {
     } catch (err) {
       update({ phase: 'idle', scanProgress: null });
       const msg = err.message || 'Unknown error';
-      console.error('[scan error]', msg);
       showToast(`Scan failed: ${msg}`);
     }
   }
