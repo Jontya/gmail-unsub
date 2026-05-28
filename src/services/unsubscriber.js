@@ -1,3 +1,5 @@
+import { saveToHistory } from './unsubscribeHistory';
+
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 export async function fetchProfileEmail(token) {
@@ -54,6 +56,7 @@ export async function unsubscribeOne(googleToken, item, profileEmail) {
       throw new Error(err?.error?.message || 'Failed to send unsubscribe email.');
     }
 
+    saveToHistory(item);
     return { success: true, message: `Unsubscribe email sent to ${unsubscribeValue}` };
   }
 
@@ -69,6 +72,7 @@ export async function unsubscribeOne(googleToken, item, profileEmail) {
         throw new Error(`One-click unsubscribe failed (HTTP ${r.status})`);
       }
 
+      saveToHistory(item);
       return { success: true, message: `One-click unsubscribe sent to ${senderName}` };
     }
 
@@ -76,6 +80,7 @@ export async function unsubscribeOne(googleToken, item, profileEmail) {
     // call user-gesture-adjacent and does not block the popup.
     await new Promise((resolve) => setTimeout(resolve, 500));
     window.open(unsubscribeValue, '_blank', 'noopener,noreferrer');
+    saveToHistory(item);
     return {
       success: true,
       message: `Unsubscribe page opened for ${senderName} — confirm on the page if required`,

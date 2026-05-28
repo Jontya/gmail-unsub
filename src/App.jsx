@@ -23,8 +23,9 @@ const INITIAL_STATE = {
   toast: null,
   emailCount: 100,
   categories: { primary: true, promotions: true, social: true, updates: true },
-  scanProgress: null,    // { fetched, total } while scanning, null otherwise
-  verification: null,    // null | { status: 'verifying'|'done', results: [] }
+  scanProgress: null,              // { fetched, total } while scanning, null otherwise
+  verification: null,              // null | { status: 'verifying'|'done', results: [] }
+  showPreviouslyUnsubscribed: false,
 };
 
 export default function App() {
@@ -64,7 +65,8 @@ export default function App() {
         googleToken,
         state.emailCount,
         state.categories,
-        (fetched, total) => update({ scanProgress: { fetched, total } })
+        (fetched, total) => update({ scanProgress: { fetched, total } }),
+        state.showPreviouslyUnsubscribed
       );
       update({ phase: 'results', lists, scanProgress: null });
     } catch (err) {
@@ -176,7 +178,8 @@ export default function App() {
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────────
-  const { phase, lists, toast, emailCount, categories, scanProgress, verification } = state;
+  const { phase, lists, toast, emailCount, categories, scanProgress, verification,
+          showPreviouslyUnsubscribed } = state;
   const gmailConnected  = Boolean(googleToken);
   const noCategorySelected = Object.values(categories).every((v) => !v);
   const pendingLists    = lists.filter((l) => l.status === 'pending');
@@ -211,6 +214,8 @@ export default function App() {
           onEmailCountChange={(v) => update({ emailCount: v })}
           categories={categories}
           onCategoryToggle={toggleCategory}
+          showPreviouslyUnsubscribed={showPreviouslyUnsubscribed}
+          onShowPreviouslyUnsubscribedChange={(v) => update({ showPreviouslyUnsubscribed: v })}
           disabled={isScanning}
         />
       )}

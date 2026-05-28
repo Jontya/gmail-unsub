@@ -44,7 +44,8 @@ function StatusOverlay({ status, statusMessage }) {
 }
 
 export default function MailingListCard({ item, index, onToggle, disabled }) {
-  const { senderName, senderEmail, exampleSubject, unsubscribeMethod, checked, status, statusMessage } = item;
+  const { senderName, senderEmail, exampleSubject, unsubscribeMethod, checked, status, statusMessage,
+          previouslyUnsubscribed } = item;
   const color = avatarColor(senderName);
   const initial = avatarInitial(senderName);
   const isDone = status === 'success' || status === 'failed' || status === 'processing';
@@ -81,6 +82,9 @@ export default function MailingListCard({ item, index, onToggle, disabled }) {
               <span className="card__email">{senderEmail}</span>
               {exampleSubject && (
                 <span className="card__subject" title={exampleSubject}>{exampleSubject}</span>
+              )}
+              {previouslyUnsubscribed && (
+                <span className="card__prev-badge">Unsubscribed before</span>
               )}
             </div>
           </div>

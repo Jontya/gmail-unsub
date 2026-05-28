@@ -56,7 +56,8 @@ const CATEGORIES = [
   },
 ];
 
-export default function ScanOptions({ emailCount, onEmailCountChange, categories, onCategoryToggle, disabled }) {
+export default function ScanOptions({ emailCount, onEmailCountChange, categories, onCategoryToggle,
+                                      showPreviouslyUnsubscribed, onShowPreviouslyUnsubscribedChange, disabled }) {
   const min = 50;
   const max = 1000;
   const fillPct = ((emailCount - min) / (max - min)) * 100;
@@ -124,6 +125,22 @@ export default function ScanOptions({ emailCount, onEmailCountChange, categories
         {Object.values(categories).every((v) => !v) && (
           <p className="scan-options__warn">Select at least one inbox to scan.</p>
         )}
+      </div>
+
+      <div className="scan-options__divider" />
+
+      <div className="scan-options__group scan-options__group--row">
+        <span className="scan-options__label">Show previously unsubscribed</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showPreviouslyUnsubscribed}
+          className={`toggle${showPreviouslyUnsubscribed ? ' toggle--on' : ''}`}
+          onClick={() => !disabled && onShowPreviouslyUnsubscribedChange(!showPreviouslyUnsubscribed)}
+          disabled={disabled}
+        >
+          <span className="toggle__knob" />
+        </button>
       </div>
 
     </div>

@@ -1,4 +1,5 @@
 import { parseFrom, parseUnsubscribeHeader, scoreMessage } from '../utils/emailParsing';
+import { isAlreadyUnsubscribed } from './unsubscribeHistory';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
@@ -85,7 +86,8 @@ export async function scanInbox(
   googleToken,
   emailCount = 100,
   categories = { primary: true, promotions: true, social: true, updates: true },
-  onProgress = () => {}
+  onProgress = () => {},
+  showPreviouslyUnsubscribed = false
 ) {
   // Always restrict to promotional mail that advertises an unsubscribe mechanism.
   const q = 'category:promotions has:list-unsubscribe';
@@ -143,7 +145,15 @@ export async function scanInbox(
     `[scan] ${withHeader}/${messages.length} emails had List-Unsubscribe → ${domainMap.size} unique senders`
   );
 
-  return [...domainMap.values()];
+  const items = [];
+  for (const item of domainMap.values()) {
+    if (isAlreadyUnsubscribed(item.domain)) {
+      if (showPreviouslyUnsubscribed) items.push({ ...item, previouslyUnsubscribed: true });
+    } else {
+      items.push(item);
+    }
+  }
+  return items;
 }
 
 // For each successfully unsubscribed item, search for emails from that sender
