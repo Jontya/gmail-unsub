@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 export default function GoogleConnect({ token, loading, error, gisReady, onConnect, onDisconnect, disabled }) {
-  const [clientId, setClientId] = useState('');
+  const [clientId, setClientId] = useState(() => localStorage.getItem('googleClientId') ?? '');
   const [showInput, setShowInput] = useState(false);
 
   if (token) {
@@ -16,7 +16,11 @@ export default function GoogleConnect({ token, loading, error, gisReady, onConne
           </svg>
           Gmail connected
         </span>
-        <button className="google-connect__disconnect" onClick={onDisconnect} type="button">
+        <button
+          className="google-connect__disconnect"
+          onClick={() => { localStorage.removeItem('googleClientId'); onDisconnect(); }}
+          type="button"
+        >
           Disconnect
         </button>
       </div>
@@ -72,7 +76,7 @@ export default function GoogleConnect({ token, loading, error, gisReady, onConne
       <button
         type="button"
         className="google-connect__btn"
-        onClick={() => onConnect(clientId)}
+        onClick={() => { localStorage.setItem('googleClientId', clientId); onConnect(clientId); }}
         disabled={disabled || loading || !gisReady}
       >
         {loading ? (
